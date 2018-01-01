@@ -1,0 +1,32 @@
+.form-information label {
+	margin-top: 7px;
+	
+}
+.form-information input {
+	width: 800px;
+}
+.form-information input[type=submit] {
+	margin-top: 10px;
+}
+
+.form-information select {
+    width: 800px;
+}
+
+.form-information textarea {
+	width: 800px;
+	height: 100px;
+	resize: none;
+}
+/* .form-group {
+	display: inline-block;
+} */
+
+#canvas {
+	border: 1px solid #333;
+	margin-top: 50px;
+	width: 800px;
+	height: 400px;
+	background-color: #e8f2f7;
+	border-radius: 5px;
+}
