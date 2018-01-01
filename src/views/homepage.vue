@@ -18,8 +18,8 @@
           <center>
             <h2>Xin chào {{taixe.username}}</h2>
           </center>
-          <div class="col-sm-5">
-            <gmap-map :center="center" :zoom="4" style="height: 300px" >
+          <div class="col-sm-5" >
+            <gmap-map id="map" :center="center" :zoom="10" style="height: 300px" >
               <template  v-for="marker in taixeInfo">
                 <gmap-marker  v-if="marker.username===taixe.username " :position="marker.location" :clickable="true" :draggable="true" @click="clickMarker($event,marker)" @dragend="dragMarker($event, marker)" :label="'A'"></gmap-marker>
                 <gmap-marker  v-if="marker.username===taixe.username && (typeof marker.khachhang !=='undefined')"   :position="marker.khachhang.location" :clickable="true" :draggable="true" @click="clickMarker($event,marker)" @dragend="dragMarker($event, marker)" :label="'B'" ></gmap-marker>
@@ -29,7 +29,7 @@
           <div class="col-sm-6">
             <table class="table table-hover table-bordered">
               <thead>
-                <tr>
+                <tr >
                   <th>Time</th>
                   <th>Địa chỉ đón</th>
                   <th>Số điện thoại</th>
@@ -38,13 +38,13 @@
               </thead>
               <tbody >
                 <template v-for="marker in taixeInfo">
-                  <tr v-if="marker.username===taixe.username && (typeof marker.khachhang !=='undefined')" >
+                  <tr v-if="marker.username===taixe.username && marker.status==='DANG-SAN-SANG' && typeof marker.khachhang!=='undefined'" >
                     <td>{{marker.khachhang.date}}</td>
                     <td>  {{marker.khachhang.address}}  </td>
                     <td>{{marker.khachhang.phone}}  </td>
                     <td>
-                      <button @click.prevent="agree(true, marker)" class="btn btn-primary btn-sm">Đồng ý</button>
-                      <button @click.prevent="agree(false, marker)" class="btn btn-primary btn-sm">Không</button>
+                      <button :disabled="!isAgree" @click.prevent="agree(true, marker)" class="btn btn-primary btn-sm">Đồng ý</button>
+                      <button :disabled="!isAgree" @click.prevent="agree(false, marker)" class="btn btn-primary btn-sm">Không</button>
                     </td>
                   </tr>
                 </template>
@@ -73,10 +73,12 @@ import Firebase from 'firebase'
  let app = Firebase.initializeApp(config);
  let db = app.database();
  let taixeInfoRef = db.ref('taixe-info');
+ let userInfoRef = db.ref('user-info');
 export default {
   firebase() {
     return {
-      taixeInfo : taixeInfoRef
+      taixeInfo : taixeInfoRef,
+      userInfo: userInfoRef
     }
 
   },
@@ -86,25 +88,15 @@ export default {
         username: '',
         password: '',
         location: {
-          lat:10.774597,
-          lng:106.667954
+          lat:10.7843695,
+          lng:106.6844089
         },
-        status: 'DANG-SAN-SANG'
+        status: 'DANG-SAN-SANG',
+        keyUser: '' // id cua user dang duoc don
       },
       isLogin:'notLoggin', // check login or not
       isAgree: true, //Dong y nhan khach hay khong
-      center: {
-        lat: 14.058324,
-        lng: 108.277199
-      },
-      markers:[
-        {
-          location: {
-          lat: 14.058324,
-          lng: 108.277199
-        }
-        }
-      ]
+      center: {}
 
     }
   },
@@ -115,26 +107,65 @@ export default {
 
           this.isLogin = 'logginSuccess';
           this.taixe=this.taixeInfo[i];
+          this.center = this.taixe.location;
           break;
         } else {
           this.isLogin = 'logginFail';
         }
       }
-  //    taixeInfoRef.push(this.taixe)
+    //  taixeInfoRef.push(this.taixe)
       },
+    direction: function(obj) {
+      console.log(obj);
+      var directionsService = new google.maps.DirectionsService;
+        var directionsDisplay = new google.maps.DirectionsRenderer({draggable:true});
+        var source = new google.maps.LatLng(obj.location.lat, obj.location.lng);
+        var des = new google.maps.LatLng(obj.khachhang.location.lat, obj.khachhang.location.lng);
+        directionsDisplay.setMap(new google.maps.Map(document.getElementById('map')));
+        directionsService.route({
+         origin: source,
+         destination: des,
+         travelMode: 'DRIVING'
+       }, function(response, status) {
+         console.log('haha');
+         console.log(response);
+         if (status === 'OK') {
+           directionsDisplay.setDirections(response);
+         } else {
+           window.alert('Directions request failed due to ' + status);
+         }
+       });
+    },
     agree: function(obj, marker) {
+  //    console.log(marker);
       let path = 'taixe-info' + '/' + marker['.key'];
 
       let updateTaixe = db.ref(path);
-      delete this.taixe['.key'];
+      delete marker['.key'];
 
       if(obj === true) {
-        taixe.status='DANG-CHO-KHACH';
+        marker.status='DANG-CHO-KHACH';
+        console.log(marker);
+        for(let i = 0 ; i < this.userInfo.length; i++) {
+          if(this.userInfo[i]['.key'] === marker.keyUser) {
+            let pathUser = 'user-info/' + marker.keyUser;
+            let updateUser = db.ref(pathUser);
+            this.userInfo[i]=marker;
+            this.userInfo[i].status='DA-CO-XE'
+            delete this.userInfo[i]['.key'];
+            updateUser.set(this.userInfo[i]);
+            break;
+          }
+        }
+        this.isAgree=false;
+        this.direction(marker);
+
       } else {
+        marker.status='TU-CHOI';
         this.isAgree = false;
-        delete this.taixe.khachhang;
+        delete marker.khachhang;
       }
-      updateTaixe.set(this.taixe);
+     updateTaixe.set(marker);
     }
 
   },
@@ -152,5 +183,12 @@ export default {
   //   }
   //   console.log('aaa');
   // }
+  updated() {
+
+    if(this.isLogin==='logginSuccess' && typeof this.taixe.khachhang!=='undefined'){
+
+      this.direction(this.taixe);
+    }
+  }
 }
 </script>
