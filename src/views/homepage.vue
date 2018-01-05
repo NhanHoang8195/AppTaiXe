@@ -23,13 +23,13 @@
     <gmap-map ref="map" id="map" :center="center" :zoom="10" style="height: 300px">
 
       <template v-for="marker in taixeInfo" v-if="marker.username===taixe.username">
-        <gmap-marker :position="marker.location"  :draggable="true" :title="'Vị trí của bạn'"  :label="'A'"  :clickable="false" ></gmap-marker>
+        <gmap-marker :position="marker.location"  :draggable="true" :title="'Vị trí của bạn'"  :label="'A'"  :clickable="false"  @dragend="dragMarker($event, marker)"></gmap-marker>
         <!-- @dragend="dragMarker($event, marker)" -->
         <template v-for="user in userInfo"> <!--v-if="taixe.keyuser===user['.key']" -->
              <template v-for="userdetail in marker.keyuser" v-if="userdetail===user['.key']">
               <gmap-marker :position="user.location"  :draggable="false" @click="clickMarker($event,user)"  :label="'B'", :title="user.phone" ></gmap-marker>
             </template>
-        </template>
+      </template>
       </template>
     </gmap-map>
     <template v-if="displayInfo">
@@ -83,18 +83,18 @@
                   <button  @click="agree(true,marker,user)" class="btn btn-primary btn-sm">Đồng ý</button>
                   <button @click="agree(false, marker,user)" class="btn btn-primary btn-sm">Không</button>
                 </template>
-                <template v-else-if="marker.status==='DANG-CHO-KHACH'">
+        <template v-else-if="marker.status==='DANG-CHO-KHACH'">
                   <button @click="start(marker)" class="btn btn-success btn-sm">Bắt đầu</button>
                 </template>
-                <template v-else>
+        <template v-else>
                   <button @click="end(marker, user)" class="btn btn-success btn-sm">Kết thúc</button>
                 </template>
-              </td>
-            </template>
+        </td>
+        </template>
 
-          </tr>
+        </tr>
 
-          </template>
+        </template>
       </tbody>
     </table>
   </div>
@@ -133,37 +133,29 @@ export default {
         username: '',
         password: '',
         location: {
-          lat : 10.7480929,
-          lng : 106.6352362
+          lat: 10.7480929,
+          lng: 106.6352362
         },
         status: 'DANG-SAN-SANG'
       },
       isLogin: 'notLoggin', // check login or not
       center: {},
       obj: {},
-      displayInfo:false
+      displayInfo: false,
+      userDirection: {}
     }
   },
 
   methods: {
-    dragMarker1: function(event, obj) { // keo tha vi tri hien tai
-      console.log(obj);
-      //this.direction()
-    //   console.log('here is dragMarker');
-    //   this.obj = obj;
-    //
-    //   this.$http.get('https://maps.googleapis.com/maps/api/geocode/json', {
-    //     params: {
-    //       latlng: event.latLng.lat().toString() + ',' + event.latLng.lng().toString()
-    //     }
-    //   }).then(responseGoogle => {
-    //     this.reverseAddress = responseGoogle.body.results;
-    // //    directionsDisplay.setDirections(this.reverseAddress[0]);
-    // //console.log(this.reverseAddress);
-    //   }, {}).catch(() => {
-    //     alert('error');
-    //   });
-      //this.displayDialog = true;
+    dragMarker: function(event, obj) { // keo tha vi tri hien tai
+      this.taixe.location.lat = event.latLng.lat();
+      this.taixe.location.lng = event.latLng.lng();
+      var updateLinks = {};
+      updateLinks['taixe-info/' + this.taixe['.key'] + '/location'] = this.taixe.location;
+      db.ref().update(updateLinks);
+      directionsDisplay.setPanel(null);
+      directionsDisplay.setMap(null);
+      this.direction(this.taixe, this.userDirection);
     },
     clickMarker: function(event, obj) { // click vao 1 marker hien len info cua maker do
       this.displayInfo = true;
@@ -184,18 +176,12 @@ export default {
       //  taixeInfoRef.push(this.taixe)
     },
     direction: function(marker, user) {
-      console.log(this.$refs['map']);
-       directionsService = new google.maps.DirectionsService();
-       directionsDisplay =  new google.maps.DirectionsRenderer({
-       map:  this.$refs['map'].$mapObject,
-       suppressMarkers: true,
-    //   suppressInfoWindows:true,
-  //     draggable: true
-      panel: document.getElementById('directionPanel')
+      directionsService = new google.maps.DirectionsService();
+      directionsDisplay = new google.maps.DirectionsRenderer({
+        map: this.$refs['map'].$mapObject,
+        suppressMarkers: true,
+        panel: document.getElementById('directionPanel')
       });
-      directionsDisplay.addListener('directions_changed', function() {
-          dragMarker(directionsDisplay.getDirections());
-       });
       var source = new google.maps.LatLng(marker.location.lat, marker.location.lng);
       var des = new google.maps.LatLng(user.location.lat, user.location.lng);
       directionsService.route({
@@ -214,70 +200,66 @@ export default {
     },
     agree: function(obj, marker, user) {
       this.taixe = marker;
-      var updateLinks={};
+      this.userDirection = user;
+      var updateLinks = {};
 
       if (obj === true) {
         updateLinks['taixe-info' + '/' + marker['.key'] + '/status'] = 'DANG-CHO-KHACH';
-        for(let i = 0; i < this.taixeInfo.length; i++) {
-          for(let key in this.taixeInfo[i].keyuser) {
-            if(this.taixeInfo[i].username===this.taixe.username) {
-              if(this.taixeInfo[i].keyuser[key] !== user['.key']){
+        for (let i = 0; i < this.taixeInfo.length; i++) {
+          for (let key in this.taixeInfo[i].keyuser) {
+            if (this.taixeInfo[i].username === this.taixe.username) {
+              if (this.taixeInfo[i].keyuser[key] !== user['.key']) {
                 updateLinks['taixe-info' + '/' + this.taixeInfo[i]['.key'] + '/keyuser/' + key] = null;
               }
-            }
-            else if(this.taixeInfo[i].keyuser[key] === user['.key']) {
+            } else if (this.taixeInfo[i].keyuser[key] === user['.key']) {
               updateLinks['taixe-info' + '/' + this.taixeInfo[i]['.key'] + '/keyuser/' + key] = null;
             }
           }
         }
-        updateLinks['user-info/'+user['.key']+'/status'] = 'DA-CO-XE';
+        updateLinks['user-info/' + user['.key'] + '/status'] = 'DA-CO-XE';
         db.ref().update(updateLinks);
-         this.direction(marker, user);
+        this.direction(marker, user);
       } else {
         let count = 0;
-        for(let i = 0; i < this.taixeInfo.length; i++) {
-          for(let key in this.taixeInfo[i].keyuser) {
-                if(this.taixeInfo[i].keyuser[key]===user['.key']) {
-                  count++;
-                  break;
-                }
-            }
-          }
-          if(count === this.taixeInfo.length) {
-            updateLinks['user-info' + '/' + user['.key'] + '/status/'] = 'KHONG-CO-XE';
-            db.ref().update(updateLinks);
-            updateLinks={}
-          }
-        for(let key in this.taixe.keyuser) {
-            if(this.taixe.keyuser[key] === user['.key']){
-              updateLinks['taixe-info' + '/' + this.taixe['.key'] + '/keyuser/' +key] = null;
-              db.ref().update(updateLinks);
-
+        for (let i = 0; i < this.taixeInfo.length; i++) {
+          for (let key in this.taixeInfo[i].keyuser) {
+            if (this.taixeInfo[i].keyuser[key] === user['.key']) {
+              count++;
               break;
             }
           }
+        }
+        if (count === this.taixeInfo.length) {
+          updateLinks['user-info' + '/' + user['.key'] + '/status/'] = 'KHONG-CO-XE';
+          db.ref().update(updateLinks);
+          updateLinks = {}
+        }
+        for (let key in this.taixe.keyuser) {
+          if (this.taixe.keyuser[key] === user['.key']) {
+            updateLinks['taixe-info' + '/' + this.taixe['.key'] + '/keyuser/' + key] = null;
+            db.ref().update(updateLinks);
+
+            break;
+          }
+        }
       }
 
     },
-    start: function (obj) {
-        var updateLinks={};
-        updateLinks['taixe-info' + '/' + obj['.key'] + '/status'] = 'BAT-DAU';
-        db.ref().update(updateLinks);
+    start: function(obj) {
+      var updateLinks = {};
+      updateLinks['taixe-info' + '/' + obj['.key'] + '/status'] = 'BAT-DAU';
+      db.ref().update(updateLinks);
     },
     end: function(obj, user) {
-      var updateLinks={};
+      var updateLinks = {};
       updateLinks['taixe-info' + '/' + obj['.key'] + '/status'] = 'DANG-SAN-SANG';
       updateLinks['taixe-info' + '/' + obj['.key'] + '/keyuser'] = null;
       updateLinks['user-info' + '/' + user['.key'] + '/status'] = 'KET-THUC';
+      updateLinks['taixe-info' + '/' + obj['.key'] + '/location'] = user.location;
       db.ref().update(updateLinks);
       directionsDisplay.setMap(null);
 
     }
-  },
-created: {
-  dragMarker: function(obj) {
-    console.log(obj);
   }
-}
 }
 </script>
