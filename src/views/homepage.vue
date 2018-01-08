@@ -217,6 +217,7 @@ export default {
           }
         }
         updateLinks['user-info/' + user['.key'] + '/status'] = 'DA-CO-XE';
+        updateLinks['user-info/' + user['.key'] + '/taixe'] = marker.username;
         db.ref().update(updateLinks);
         this.direction(marker, user);
       } else {
@@ -255,6 +256,7 @@ export default {
       updateLinks['taixe-info' + '/' + obj['.key'] + '/status'] = 'DANG-SAN-SANG';
       updateLinks['taixe-info' + '/' + obj['.key'] + '/keyuser'] = null;
       updateLinks['user-info' + '/' + user['.key'] + '/status'] = 'KET-THUC';
+      updateLinks['user-info' + '/' + user['.key'] + '/taixe'] = null;
       updateLinks['taixe-info' + '/' + obj['.key'] + '/location'] = user.location;
       db.ref().update(updateLinks);
       directionsDisplay.setMap(null);
